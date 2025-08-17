@@ -94,6 +94,12 @@
             color: #495057;
         }
 
+        input[type="text"]:read-only {
+            background: #f8f9fa;
+            color: #6c757d;
+            border-color: #dee2e6;
+        }
+
         input[type="text"]:focus, input[type="number"]:focus {
             outline: none;
             border-color: #667eea;
@@ -335,8 +341,22 @@
             <p class="sub-heading">Nó dịch chuyển hoặc 'xoay' bảng chữ cái, và đôi khi được gọi là Mật mã Xoay (ví dụ: ROT-13 cho dịch chuyển 13). Nó rất dễ bị tấn công bằng phân tích tần suất chữ cái và do đó dễ bị phá vỡ.</p>
             
             <section id="inputs">
+                <div class="group" style="grid-column: 1 / -1; margin-bottom: 20px;">
+                    <h3>Chế độ hoạt động</h3>
+                    <div style="display: flex; gap: 30px; justify-content: center; align-items: center;">
+                        <label style="display: flex; align-items: center; gap: 8px; font-size: 16px; cursor: pointer;">
+                            <input type="radio" name="mode" value="encrypt" checked style="transform: scale(1.2);">
+                            <span>🔐 Mã hóa</span>
+                        </label>
+                        <label style="display: flex; align-items: center; gap: 8px; font-size: 16px; cursor: pointer;">
+                            <input type="radio" name="mode" value="decrypt" style="transform: scale(1.2);">
+                            <span>🔍 Thám mã</span>
+                        </label>
+                    </div>
+                </div>
+
                 <div class="group">
-                    <h3>Văn bản gốc</h3>
+                    <h3 id="input-label">Văn bản gốc</h3>
                     <input type="text" id="plaintext-input" placeholder="Nhập văn bản cần mã hóa..." value="HELLO WORLD">
                 </div>
                 
@@ -346,12 +366,12 @@
                 </div>
                 
                 <div class="group">
-                    <h3>Văn bản mã hóa</h3>
+                    <h3 id="output-label">Văn bản mã hóa</h3>
                     <input type="text" id="ciphertext-input" placeholder="Kết quả mã hóa..." value="KHOOR ZRUOG">
                 </div>
             </section>
             
-            <p class="instruction">Hướng dẫn: Chọn giá trị Khóa (Dịch chuyển) và nhập vào ô Văn bản gốc hoặc Văn bản mã hóa để xem quá trình mã hóa hoạt động.</p>
+            <p class="instruction" id="instruction-text">Hướng dẫn: Chọn chế độ Mã hóa, nhập văn bản gốc và khóa để xem kết quả mã hóa. Hoặc chọn chế độ Thám mã, nhập văn bản mã hóa và khóa để giải mã.</p>
         </header>
 
         <main>
@@ -501,44 +521,101 @@
             });
         }
 
+        // Cập nhật nhãn giao diện theo chế độ
+        function updateLabels(mode) {
+            const inputLabel = document.getElementById('input-label');
+            const outputLabel = document.getElementById('output-label');
+            const plaintextInput = document.getElementById('plaintext-input');
+            const ciphertextInput = document.getElementById('ciphertext-input');
+            const instructionText = document.getElementById('instruction-text');
+            
+            if (mode === 'encrypt') {
+                inputLabel.textContent = 'Văn bản gốc';
+                outputLabel.textContent = 'Văn bản mã hóa';
+                plaintextInput.placeholder = 'Nhập văn bản cần mã hóa...';
+                ciphertextInput.placeholder = 'Kết quả mã hóa...';
+                ciphertextInput.readOnly = true;
+                plaintextInput.readOnly = false;
+                instructionText.textContent = 'Hướng dẫn: Chế độ Mã hóa - Nhập văn bản gốc và chọn khóa để xem kết quả mã hóa.';
+            } else {
+                inputLabel.textContent = 'Văn bản mã hóa';
+                outputLabel.textContent = 'Văn bản gốc';
+                plaintextInput.placeholder = 'Kết quả giải mã...';
+                ciphertextInput.placeholder = 'Nhập văn bản cần giải mã...';
+                ciphertextInput.readOnly = false;
+                plaintextInput.readOnly = true;
+                instructionText.textContent = 'Hướng dẫn: Chế độ Thám mã - Nhập văn bản mã hóa và chọn khóa để xem kết quả giải mã.';
+            }
+        }
+
         // Cập nhật toàn bộ giao diện
         function updateDisplay() {
-            const plaintext = document.getElementById('plaintext-input').value;
+            const mode = document.querySelector('input[name="mode"]:checked').value;
             const key = parseInt(document.getElementById('key-input').value) || 0;
-            const ciphertext = caesarCipher(plaintext, key);
             
-            document.getElementById('ciphertext-input').value = ciphertext;
+            if (mode === 'encrypt') {
+                const plaintext = document.getElementById('plaintext-input').value;
+                const ciphertext = caesarCipher(plaintext, key);
+                document.getElementById('ciphertext-input').value = ciphertext;
+                
+                // Cập nhật biểu đồ tần suất
+                const plainFreq = calculateFrequency(plaintext);
+                const cipherFreq = calculateFrequency(ciphertext);
+                updateChart('plaintext-chart', plainFreq);
+                updateChart('ciphertext-chart', cipherFreq);
+                
+                // Highlight chữ cái được sử dụng
+                highlightUsedLetters(plaintext, true);
+                highlightUsedLetters(ciphertext, false);
+            } else {
+                const ciphertext = document.getElementById('ciphertext-input').value;
+                const plaintext = caesarCipher(ciphertext, key, true);
+                document.getElementById('plaintext-input').value = plaintext;
+                
+                // Cập nhật biểu đồ tần suất
+                const cipherFreq = calculateFrequency(ciphertext);
+                const plainFreq = calculateFrequency(plaintext);
+                updateChart('plaintext-chart', plainFreq);
+                updateChart('ciphertext-chart', cipherFreq);
+                
+                // Highlight chữ cái được sử dụng
+                highlightUsedLetters(plaintext, true);
+                highlightUsedLetters(ciphertext, false);
+            }
             
             // Cập nhật bảng chữ cái mã hóa
             updateCipherAlphabet(key);
-            
-            // Cập nhật biểu đồ tần suất
-            const plainFreq = calculateFrequency(plaintext);
-            const cipherFreq = calculateFrequency(ciphertext);
-            updateChart('plaintext-chart', plainFreq);
-            updateChart('ciphertext-chart', cipherFreq);
-            
-            // Highlight chữ cái được sử dụng
-            highlightUsedLetters(plaintext, true);
-            highlightUsedLetters(ciphertext, false);
         }
 
-        // Xử lý khi giải mã
-        function handleDecryption() {
-            const ciphertext = document.getElementById('ciphertext-input').value;
-            const key = parseInt(document.getElementById('key-input').value) || 0;
-            const plaintext = caesarCipher(ciphertext, key, true);
+        // Xử lý thay đổi chế độ
+        function handleModeChange() {
+            const mode = document.querySelector('input[name="mode"]:checked').value;
+            updateLabels(mode);
             
-            document.getElementById('plaintext-input').value = plaintext;
+            // Reset giá trị input khi chuyển chế độ
+            if (mode === 'encrypt') {
+                document.getElementById('plaintext-input').value = 'HELLO WORLD';
+                document.getElementById('ciphertext-input').value = '';
+            } else {
+                document.getElementById('ciphertext-input').value = 'KHOOR ZRUOG';
+                document.getElementById('plaintext-input').value = '';
+            }
+            
             updateDisplay();
         }
 
         // Event listeners
         document.getElementById('plaintext-input').addEventListener('input', updateDisplay);
         document.getElementById('key-input').addEventListener('input', updateDisplay);
-        document.getElementById('ciphertext-input').addEventListener('input', handleDecryption);
+        document.getElementById('ciphertext-input').addEventListener('input', updateDisplay);
+        
+        // Event listener cho radio buttons
+        document.querySelectorAll('input[name="mode"]').forEach(radio => {
+            radio.addEventListener('change', handleModeChange);
+        });
 
         // Khởi tạo
+        updateLabels('encrypt');
         updateDisplay();
     </script>
 </body>
