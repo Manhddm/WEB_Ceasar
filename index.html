@@ -369,6 +369,11 @@
                     <h3 id="output-label">Văn bản mã hóa</h3>
                     <input type="text" id="ciphertext-input" placeholder="Kết quả mã hóa..." value="KHOOR ZRUOG">
                 </div>
+                
+                <div class="group" id="backtrack-results" style="display:none; grid-column: 1 / -1;">
+                    <h3>Kết quả giải mã với tất cả các khóa (Backtrack)</h3>
+                    <div id="backtrack-list" style="max-height: 250px; overflow-y: auto; background: #f8f9fa; border-radius: 10px; padding: 10px; border: 1px solid #e9ecef;"></div>
+                </div>
             </section>
             
             <p class="instruction" id="instruction-text">Hướng dẫn: Chọn chế độ Mã hóa, nhập văn bản gốc và khóa để xem kết quả mã hóa. Hoặc chọn chế độ Thám mã, nhập văn bản mã hóa và khóa để giải mã.</p>
@@ -450,173 +455,187 @@
         </main>
     </div>
 
-    <script>
-        // Hàm Caesar Cipher
-        function caesarCipher(text, shift, decrypt = false) {
-            if (decrypt) shift = -shift;
-            
-            return text.toUpperCase().replace(/[A-Z]/g, function(char) {
-                const code = char.charCodeAt(0) - 65;
-                const shifted = (code + shift + 26) % 26;
-                return String.fromCharCode(shifted + 65);
-            });
-        }
-
-        // Cập nhật bảng chữ cái mã hóa
-        function updateCipherAlphabet(shift) {
-            const cipherChars = document.querySelectorAll('#ciphertext-chars .char');
-            const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-            
-            cipherChars.forEach((char, index) => {
-                const newIndex = (index + shift) % 26;
-                char.textContent = alphabet[newIndex];
-            });
-        }
-
-        // Tính toán tần suất chữ cái
-        function calculateFrequency(text) {
-            const freq = new Array(26).fill(0);
-            const cleanText = text.toUpperCase().replace(/[^A-Z]/g, '');
-            
-            for (let char of cleanText) {
-                freq[char.charCodeAt(0) - 65]++;
+        <script>
+            // Hàm Caesar Cipher
+            function caesarCipher(text, shift, decrypt = false) {
+                if (decrypt) shift = -shift;
+                return text.toUpperCase().replace(/[A-Z]/g, function(char) {
+                    const code = char.charCodeAt(0) - 65;
+                    const shifted = (code + shift + 26) % 26;
+                    return String.fromCharCode(shifted + 65);
+                });
             }
-            
-            return freq;
-        }
 
-        // Cập nhật biểu đồ tần suất
-        function updateChart(chartId, frequencies) {
-            const chart = document.getElementById(chartId);
-            chart.innerHTML = '';
-            
-            const maxFreq = Math.max(...frequencies, 1);
-            
-            frequencies.forEach(freq => {
-                const barContainer = document.createElement('div');
-                barContainer.className = 'bar-container';
-                
-                const bar = document.createElement('div');
-                bar.className = 'bar';
-                bar.style.height = `${(freq / maxFreq) * 150}px`;
-                bar.title = `Tần suất: ${freq}`;
-                
-                barContainer.appendChild(bar);
-                chart.appendChild(barContainer);
-            });
-        }
-
-        // Highlight chữ cái được sử dụng
-        function highlightUsedLetters(text, isPlaintext = true) {
-            const chars = document.querySelectorAll(isPlaintext ? '#plaintext-chars .char' : '#ciphertext-chars .char');
-            const usedLetters = new Set(text.toUpperCase().replace(/[^A-Z]/g, ''));
-            
-            chars.forEach((char, index) => {
-                const letter = String.fromCharCode(65 + index);
-                if (usedLetters.has(letter)) {
-                    char.classList.add('highlight');
-                } else {
-                    char.classList.remove('highlight');
+            // Backtrack giải mã tất cả các khóa
+            function backtrackDecode(ciphertext) {
+                const results = [];
+                for (let k = 0; k < 26; k++) {
+                    const plain = caesarCipher(ciphertext, k, true);
+                    results.push({ key: k, text: plain });
                 }
-            });
-        }
-
-        // Cập nhật nhãn giao diện theo chế độ
-        function updateLabels(mode) {
-            const inputLabel = document.getElementById('input-label');
-            const outputLabel = document.getElementById('output-label');
-            const plaintextInput = document.getElementById('plaintext-input');
-            const ciphertextInput = document.getElementById('ciphertext-input');
-            const instructionText = document.getElementById('instruction-text');
-            
-            if (mode === 'encrypt') {
-                inputLabel.textContent = 'Văn bản gốc';
-                outputLabel.textContent = 'Văn bản mã hóa';
-                plaintextInput.placeholder = 'Nhập văn bản cần mã hóa...';
-                ciphertextInput.placeholder = 'Kết quả mã hóa...';
-                ciphertextInput.readOnly = true;
-                plaintextInput.readOnly = false;
-                instructionText.textContent = 'Hướng dẫn: Chế độ Mã hóa - Nhập văn bản gốc và chọn khóa để xem kết quả mã hóa.';
-            } else {
-                inputLabel.textContent = 'Văn bản mã hóa';
-                outputLabel.textContent = 'Văn bản gốc';
-                plaintextInput.placeholder = 'Kết quả giải mã...';
-                ciphertextInput.placeholder = 'Nhập văn bản cần giải mã...';
-                ciphertextInput.readOnly = false;
-                plaintextInput.readOnly = true;
-                instructionText.textContent = 'Hướng dẫn: Chế độ Thám mã - Nhập văn bản mã hóa và chọn khóa để xem kết quả giải mã.';
+                return results;
             }
-        }
 
-        // Cập nhật toàn bộ giao diện
-        function updateDisplay() {
-            const mode = document.querySelector('input[name="mode"]:checked').value;
-            const key = parseInt(document.getElementById('key-input').value) || 0;
-            
-            if (mode === 'encrypt') {
-                const plaintext = document.getElementById('plaintext-input').value;
-                const ciphertext = caesarCipher(plaintext, key);
-                document.getElementById('ciphertext-input').value = ciphertext;
-                
-                // Cập nhật biểu đồ tần suất
-                const plainFreq = calculateFrequency(plaintext);
-                const cipherFreq = calculateFrequency(ciphertext);
-                updateChart('plaintext-chart', plainFreq);
-                updateChart('ciphertext-chart', cipherFreq);
-                
-                // Highlight chữ cái được sử dụng
-                highlightUsedLetters(plaintext, true);
-                highlightUsedLetters(ciphertext, false);
-            } else {
-                const ciphertext = document.getElementById('ciphertext-input').value;
-                const plaintext = caesarCipher(ciphertext, key, true);
-                document.getElementById('plaintext-input').value = plaintext;
-                
-                // Cập nhật biểu đồ tần suất
-                const cipherFreq = calculateFrequency(ciphertext);
-                const plainFreq = calculateFrequency(plaintext);
-                updateChart('plaintext-chart', plainFreq);
-                updateChart('ciphertext-chart', cipherFreq);
-                
-                // Highlight chữ cái được sử dụng
-                highlightUsedLetters(plaintext, true);
-                highlightUsedLetters(ciphertext, false);
+            // Hiển thị kết quả backtrack
+            function showBacktrackResults(ciphertext) {
+                const container = document.getElementById('backtrack-results');
+                const list = document.getElementById('backtrack-list');
+                if (!ciphertext.trim()) {
+                    container.style.display = 'none';
+                    list.innerHTML = '';
+                    return;
+                }
+                const results = backtrackDecode(ciphertext);
+                let html = '';
+                results.forEach(r => {
+                    html += `<div style="padding:4px 0;"><strong>Khóa ${r.key}:</strong> <span style="font-family:monospace;">${r.text}</span></div>`;
+                });
+                list.innerHTML = html;
+                container.style.display = 'block';
             }
-            
+
             // Cập nhật bảng chữ cái mã hóa
-            updateCipherAlphabet(key);
-        }
-
-        // Xử lý thay đổi chế độ
-        function handleModeChange() {
-            const mode = document.querySelector('input[name="mode"]:checked').value;
-            updateLabels(mode);
-            
-            // Reset giá trị input khi chuyển chế độ
-            if (mode === 'encrypt') {
-                document.getElementById('plaintext-input').value = 'HELLO WORLD';
-                document.getElementById('ciphertext-input').value = '';
-            } else {
-                document.getElementById('ciphertext-input').value = 'KHOOR ZRUOG';
-                document.getElementById('plaintext-input').value = '';
+            function updateCipherAlphabet(shift) {
+                const cipherChars = document.querySelectorAll('#ciphertext-chars .char');
+                const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+                cipherChars.forEach((char, index) => {
+                    const newIndex = (index + shift) % 26;
+                    char.textContent = alphabet[newIndex];
+                });
             }
-            
+
+            // Tính toán tần suất chữ cái
+            function calculateFrequency(text) {
+                const freq = new Array(26).fill(0);
+                const cleanText = text.toUpperCase().replace(/[^A-Z]/g, '');
+                for (let char of cleanText) {
+                    freq[char.charCodeAt(0) - 65]++;
+                }
+                return freq;
+            }
+
+            // Cập nhật biểu đồ tần suất
+            function updateChart(chartId, frequencies) {
+                const chart = document.getElementById(chartId);
+                chart.innerHTML = '';
+                const maxFreq = Math.max(...frequencies, 1);
+                frequencies.forEach(freq => {
+                    const barContainer = document.createElement('div');
+                    barContainer.className = 'bar-container';
+                    const bar = document.createElement('div');
+                    bar.className = 'bar';
+                    bar.style.height = `${(freq / maxFreq) * 150}px`;
+                    bar.title = `Tần suất: ${freq}`;
+                    barContainer.appendChild(bar);
+                    chart.appendChild(barContainer);
+                });
+            }
+
+            // Highlight chữ cái được sử dụng
+            function highlightUsedLetters(text, isPlaintext = true) {
+                const chars = document.querySelectorAll(isPlaintext ? '#plaintext-chars .char' : '#ciphertext-chars .char');
+                const usedLetters = new Set(text.toUpperCase().replace(/[^A-Z]/g, ''));
+                chars.forEach((char, index) => {
+                    const letter = String.fromCharCode(65 + index);
+                    if (usedLetters.has(letter)) {
+                        char.classList.add('highlight');
+                    } else {
+                        char.classList.remove('highlight');
+                    }
+                });
+            }
+
+            // Cập nhật nhãn giao diện theo chế độ
+            function updateLabels(mode) {
+                const inputLabel = document.getElementById('input-label');
+                const outputLabel = document.getElementById('output-label');
+                const plaintextInput = document.getElementById('plaintext-input');
+                const ciphertextInput = document.getElementById('ciphertext-input');
+                const instructionText = document.getElementById('instruction-text');
+                const backtrackResults = document.getElementById('backtrack-results');
+                if (mode === 'encrypt') {
+                    inputLabel.textContent = 'Văn bản gốc';
+                    outputLabel.textContent = 'Văn bản mã hóa';
+                    plaintextInput.placeholder = 'Nhập văn bản cần mã hóa...';
+                    ciphertextInput.placeholder = 'Kết quả mã hóa...';
+                    ciphertextInput.readOnly = true;
+                    plaintextInput.readOnly = false;
+                    instructionText.textContent = 'Hướng dẫn: Chế độ Mã hóa - Nhập văn bản gốc và chọn khóa để xem kết quả mã hóa.';
+                    backtrackResults.style.display = 'none';
+                } else {
+                    inputLabel.textContent = 'Văn bản mã hóa';
+                    outputLabel.textContent = 'Văn bản gốc';
+                    plaintextInput.placeholder = 'Kết quả giải mã...';
+                    ciphertextInput.placeholder = 'Nhập văn bản cần giải mã...';
+                    ciphertextInput.readOnly = false;
+                    plaintextInput.readOnly = true;
+                    instructionText.textContent = 'Hướng dẫn: Chế độ Thám mã - Nhập văn bản mã hóa và chọn khóa để xem kết quả giải mã hoặc thử tất cả các khóa.';
+                }
+            }
+
+            // Cập nhật toàn bộ giao diện
+            function updateDisplay() {
+                const mode = document.querySelector('input[name="mode"]:checked').value;
+                const key = parseInt(document.getElementById('key-input').value) || 0;
+                if (mode === 'encrypt') {
+                    const plaintext = document.getElementById('plaintext-input').value;
+                    const ciphertext = caesarCipher(plaintext, key);
+                    document.getElementById('ciphertext-input').value = ciphertext;
+                    // Cập nhật biểu đồ tần suất
+                    const plainFreq = calculateFrequency(plaintext);
+                    const cipherFreq = calculateFrequency(ciphertext);
+                    updateChart('plaintext-chart', plainFreq);
+                    updateChart('ciphertext-chart', cipherFreq);
+                    // Highlight chữ cái được sử dụng
+                    highlightUsedLetters(plaintext, true);
+                    highlightUsedLetters(ciphertext, false);
+                    // Ẩn kết quả backtrack
+                    document.getElementById('backtrack-results').style.display = 'none';
+                } else {
+                    const ciphertext = document.getElementById('ciphertext-input').value;
+                    const plaintext = caesarCipher(ciphertext, key, true);
+                    document.getElementById('plaintext-input').value = plaintext;
+                    // Cập nhật biểu đồ tần suất
+                    const cipherFreq = calculateFrequency(ciphertext);
+                    const plainFreq = calculateFrequency(plaintext);
+                    updateChart('plaintext-chart', plainFreq);
+                    updateChart('ciphertext-chart', cipherFreq);
+                    // Highlight chữ cái được sử dụng
+                    highlightUsedLetters(plaintext, true);
+                    highlightUsedLetters(ciphertext, false);
+                    // Hiển thị kết quả backtrack
+                    showBacktrackResults(ciphertext);
+                }
+                // Cập nhật bảng chữ cái mã hóa
+                updateCipherAlphabet(key);
+            }
+
+            // Xử lý thay đổi chế độ
+            function handleModeChange() {
+                const mode = document.querySelector('input[name="mode"]:checked').value;
+                updateLabels(mode);
+                // Reset giá trị input khi chuyển chế độ
+                if (mode === 'encrypt') {
+                    document.getElementById('plaintext-input').value = 'HELLO WORLD';
+                    document.getElementById('ciphertext-input').value = '';
+                } else {
+                    document.getElementById('ciphertext-input').value = 'KHOOR ZRUOG';
+                    document.getElementById('plaintext-input').value = '';
+                }
+                updateDisplay();
+            }
+
+            // Event listeners
+            document.getElementById('plaintext-input').addEventListener('input', updateDisplay);
+            document.getElementById('key-input').addEventListener('input', updateDisplay);
+            document.getElementById('ciphertext-input').addEventListener('input', updateDisplay);
+            // Event listener cho radio buttons
+            document.querySelectorAll('input[name="mode"]').forEach(radio => {
+                radio.addEventListener('change', handleModeChange);
+            });
+            // Khởi tạo
+            updateLabels('encrypt');
             updateDisplay();
-        }
-
-        // Event listeners
-        document.getElementById('plaintext-input').addEventListener('input', updateDisplay);
-        document.getElementById('key-input').addEventListener('input', updateDisplay);
-        document.getElementById('ciphertext-input').addEventListener('input', updateDisplay);
-        
-        // Event listener cho radio buttons
-        document.querySelectorAll('input[name="mode"]').forEach(radio => {
-            radio.addEventListener('change', handleModeChange);
-        });
-
-        // Khởi tạo
-        updateLabels('encrypt');
-        updateDisplay();
-    </script>
+        </script>
 </body>
 </html>
